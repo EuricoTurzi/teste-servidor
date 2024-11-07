@@ -1,3 +1,6 @@
+import eventlet
+eventlet.monkey_patch()  # Deve ser chamado antes de qualquer outro import
+
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit
@@ -136,4 +139,4 @@ if __name__ == '__main__':
         db.create_all()  # Cria as tabelas no banco de dados
     # Use a porta fornecida pelo Railway, com fallback para 8080
     port = int(os.environ.get("PORT", 8080))
-    socketio.run(app, host='0.0.0.0', port=port)
+    socketio.run(app, host='0.0.0.0', port=port)  # Parâmetro server='eventlet' foi removido
