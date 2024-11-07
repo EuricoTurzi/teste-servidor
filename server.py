@@ -65,36 +65,23 @@ def receive_data():
     if len(neighbor_cells) != 6:
         return jsonify({'status': 'error', 'message': 'Exatamente 6 células vizinhas são necessárias'}), 400
 
-    # Verifica se já existe um registro para este device_id e, em caso afirmativo, remove as células vizinhas associadas
+    # Verifica se já existe um registro para este device_id
     existing_device = DeviceData.query.filter_by(device_id=data['device_id']).first()
+
+    # Se o dispositivo já existe, atualize o registro e exclua as células vizinhas antigas
     if existing_device:
         # Exclui as células vizinhas associadas ao dispositivo
         NeighborCell.query.filter_by(device_data_id=existing_device.id).delete()
-        db.session.commit()
+        db.session.commit()  # Confirma a exclusão das células vizinhas
 
         # Atualiza os dados do dispositivo
-        existing_device.sw_version = data['sw_version']
-        existing_device.model = data['model']
-        existing_device.cell_id = data['cell_id']
-        existing_device.mcc = data['mcc']
-        existing_device.mnc = data['mnc']
-        existing_device.rx_lvl = data['rx_lvl']
-        existing_device.lac = data['lac']
-        existing_device.tm_adv = data['tm_adv']
-        existing_device.backup_voltage = data['backup_voltage']
-        existing_device.online_status = data['online_status']
-        existing_device.message_number = data['message_number']
-        existing_device.mode = data['mode']
-        existing_device.col_net_rf_ch = data['col_net_rf_ch']
-        existing_device.gps_date = data['gps_date']
-        existing_device.gps_time = data['gps_time']
-        existing_device.latitude = data['latitude']
-        existing_device.longitude = data['longitude']
-        existing_device.speed = data['speed']
-        existing_device.course = data['course']
-        existing_device.satt = data['satt']
-        existing_device.gps_fix = data['gps_fix']
-        existing_device.temperature = data['temperature']
+        for field in [
+            'sw_version', 'model', 'cell_id', 'mcc', 'mnc', 'rx_lvl', 'lac', 'tm_adv',
+            'backup_voltage', 'online_status', 'message_number', 'mode', 'col_net_rf_ch',
+            'gps_date', 'gps_time', 'latitude', 'longitude', 'speed', 'course', 'satt',
+            'gps_fix', 'temperature'
+        ]:
+            setattr(existing_device, field, data.get(field))
     else:
         # Se não existe, cria um novo registro para o dispositivo
         existing_device = DeviceData(
@@ -123,29 +110,28 @@ def receive_data():
             temperature=data['temperature']
         )
         db.session.add(existing_device)
-        db.session.flush()  # Garante que `existing_device.id` é gerado
+        db.session.flush()  # Garante que `existing_device.id` é gerado antes de adicionar células vizinhas
 
     # Adiciona as 6 novas células vizinhas
     for neighbor in neighbor_cells:
         neighbor_cell = NeighborCell(
             device_data_id=existing_device.id,
-            cell_id=neighbor['cell_id'],
-            mcc=neighbor['mcc'],
-            mnc=neighbor['mnc'],
-            lac=neighbor['lac'],
-            rx_lvl=neighbor['rx_lvl'],
-            tm_adv=neighbor['tm_adv']
+            cell_id=neighbor.get('cell_id'),
+            mcc=neighbor.get('mcc'),
+            mnc=neighbor.get('mnc'),
+            lac=neighbor.get('lac'),
+            rx_lvl=neighbor.get('rx_lvl'),
+            tm_adv=neighbor.get('tm_adv')
         )
         db.session.add(neighbor_cell)
 
     db.session.commit()
-    
+
     # Emite a atualização para os clientes conectados
     socketio.emit('new_data', data)
-    
+
     return jsonify({'status': 'success'})
 
-# Interface principal para visualização em tempo real
 @app.route('/')
 def index():
     return """
@@ -166,62 +152,76 @@ def index():
         <h2>Última Atualização</h2>
         <div id="map"></div>
         <table id="data-table">
-            <tr>
-                <th>Campo</th>
-                <th>Valor</th>
-            </tr>
-            <tr><td>ID do Dispositivo</td><td id="device_id">Aguardando dados...</td></tr>
-            <tr><td>Latitude</td><td id="latitude">Aguardando dados...</td></tr>
-            <tr><td>Longitude</td><td id="longitude">Aguardando dados...</td></tr>
-            <tr><td>Velocidade</td><td id="speed">Aguardando dados...</td></tr>
-            <tr><td>Temperatura</td><td id="temperature">Aguardando dados...</td></tr>
-            <!-- Adicione outras linhas conforme necessário -->
+            <thead>
+                <tr>
+                    <th>ID do Dispositivo</th>
+                    <th>Backup Voltage</th>
+                    <th>Status Online</th>
+                    <th>Modo</th>
+                    <th>Data GPS</th>
+                    <th>Hora GPS</th>
+                    <th>Latitude</th>
+                    <th>Longitude</th>
+                    <th>GPS Fix</th>
+                </tr>
+            </thead>
+            <tbody id="data-body">
+                <!-- Dados dos dispositivos serão inseridos aqui -->
+            </tbody>
         </table>
 
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
         <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
         <script>
-            // Inicializa o mapa centrado em uma localização padrão
-            var map = L.map('map').setView([-23.636415, -46.512757], 12); // Coordenadas padrão
+            var map = L.map('map').setView([-23.636415, -46.512757], 12);
 
-            // Adiciona o tile layer do OpenStreetMap
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
                 attribution: '© OpenStreetMap'
             }).addTo(map);
 
-            // Variável para o marcador (para ser atualizado em tempo real)
-            var marker = null;
+            // Armazena marcadores para múltiplos dispositivos
+            var markers = {};
 
-            // Conecta ao servidor Socket.IO
-            var socket = io();
+            function updateData() {
+                fetch('/latest_data')
+                    .then(response => response.json())
+                    .then(devices => {
+                        // Limpa a tabela
+                        const dataBody = document.getElementById("data-body");
+                        dataBody.innerHTML = '';
 
-            // Quando novos dados forem recebidos
-            socket.on('new_data', function(data) {
-                // Atualiza a tabela de dados
-                document.getElementById("device_id").innerText = data.device_id;
-                document.getElementById("latitude").innerText = data.latitude;
-                document.getElementById("longitude").innerText = data.longitude;
-                document.getElementById("speed").innerText = data.speed;
-                document.getElementById("temperature").innerText = data.temperature;
+                        // Atualiza cada dispositivo no mapa e na tabela
+                        devices.forEach(device => {
+                            // Atualiza ou cria um marcador no mapa
+                            var lat = device.latitude;
+                            var lon = device.longitude;
+                            if (markers[device.device_id]) {
+                                markers[device.device_id].setLatLng([lat, lon]);
+                            } else {
+                                markers[device.device_id] = L.marker([lat, lon]).addTo(map)
+                                    .bindPopup("<b>ID do Dispositivo:</b> " + device.device_id);
+                            }
 
-                // Atualiza o marcador no mapa
-                var lat = data.latitude;
-                var lon = data.longitude;
-                if (marker) {
-                    // Se o marcador já existe, move-o para a nova posição
-                    marker.setLatLng([lat, lon]);
-                } else {
-                    // Se não existe, cria um novo marcador
-                    marker = L.marker([lat, lon]).addTo(map);
-                }
+                            // Adiciona uma linha na tabela para cada dispositivo
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${device.device_id}</td>
+                                <td>${device.backup_voltage}</td>
+                                <td>${device.online_status ? 'Sim' : 'Não'}</td>
+                                <td>${device.mode}</td>
+                                <td>${device.gps_date}</td>
+                                <td>${device.gps_time}</td>
+                                <td>${device.latitude}</td>
+                                <td>${device.longitude}</td>
+                                <td>${device.gps_fix ? 'Sim' : 'Não'}</td>
+                            `;
+                            dataBody.appendChild(row);
+                        });
+                    })
+                    .catch(error => console.error('Erro ao obter dados:', error));
+            }
 
-                // Atualiza a visão do mapa para a nova posição do dispositivo
-                map.setView([lat, lon], 15);
-                
-                // Pop-up com informações ao clicar no marcador
-                marker.bindPopup("<b>ID do Dispositivo:</b> " + data.device_id + "<br><b>Velocidade:</b> " + data.speed + " km/h<br><b>Temperatura:</b> " + data.temperature + " °C").openPopup();
-            });
+            setInterval(updateData, 5000);  // Atualiza a cada 5 segundos
         </script>
     </body>
     </html>
