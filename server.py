@@ -132,6 +132,37 @@ def receive_data():
 
     return jsonify({'status': 'success'})
 
+@app.route('/latest_data', methods=['GET'])
+def get_latest_data():
+    # Obtém o dado mais recente de cada dispositivo, ordenado por device_id para garantir que temos apenas os dispositivos únicos
+    devices = DeviceData.query.order_by(DeviceData.device_id, DeviceData.created_at.desc()).all()
+    
+    if not devices:
+        return jsonify({"status": "error", "message": "Nenhum dado disponível"}), 404
+
+    data = []
+    # Itera sobre os dispositivos, garantindo que apenas o último registro de cada dispositivo seja adicionado
+    seen_devices = set()
+    for device in devices:
+        if device.device_id in seen_devices:
+            continue  # Pula dispositivos que já foram adicionados
+        seen_devices.add(device.device_id)
+        
+        device_info = {
+            "device_id": device.device_id,
+            "backup_voltage": device.backup_voltage,
+            "online_status": device.online_status,
+            "mode": device.mode,
+            "gps_date": device.gps_date.isoformat(),
+            "gps_time": device.gps_time.strftime("%H:%M:%S") if device.gps_time else "N/A",
+            "latitude": device.latitude,
+            "longitude": device.longitude,
+            "gps_fix": device.gps_fix,
+        }
+        data.append(device_info)
+
+    return jsonify(data), 200
+
 @app.route('/')
 def index():
     return """
