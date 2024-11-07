@@ -1,0 +1,107 @@
+import socket
+
+def parse_st410_data(data):
+    """
+    Função para interpretar a string de retorno do ST410.
+    A string é dividida e os campos são atribuídos a variáveis correspondentes.
+    """
+    fields = data.split(';')
+    
+    # Verifica se a mensagem é do tipo ST410STT e tem pelo menos o número mínimo de campos
+    if fields[0] == "ST410STT" and len(fields) >= 50:
+        # Atribuindo os primeiros campos fixos
+        device_type = fields[0]
+        device_id = fields[1]
+        sw_version = fields[2]
+        model = fields[3]
+        
+        # Informações de rede e célula principal
+        cell_id = fields[4]
+        mcc = fields[5]
+        mnc = fields[6]
+        rx_lvl = fields[7]
+        lac = fields[8]
+        tm_adv = fields[9]
+
+        # Extrair as Neighbor Cells (6 células, cada uma com 6 campos)
+        neighbor_cells = []
+        start_index = 10
+        for i in range(6):  # Precisamos de exatamente 6 células
+            neighbor_cell = {
+                "ID": fields[start_index],
+                "MCC": fields[start_index + 1],
+                "MNC": fields[start_index + 2],
+                "LAC": fields[start_index + 3],
+                "RX_LVL": fields[start_index + 4],
+                "TM_ADV": fields[start_index + 5],
+            }
+            neighbor_cells.append(neighbor_cell)
+            start_index += 6
+
+        # Campos adicionais após as Neighbor Cells
+        backup_voltage = fields[start_index]
+        online_status = fields[start_index + 1]
+        message_number = fields[start_index + 2]
+        mode = fields[start_index + 3]
+        col_net_rf_ch = fields[start_index + 4]
+
+        # Coordenadas GPS, horário e status
+        gps_date = fields[start_index + 5]
+        gps_time = fields[start_index + 6]
+        latitude = fields[start_index + 7]
+        longitude = fields[start_index + 8]
+        speed = fields[start_index + 9]
+        course = fields[start_index + 10]
+        satt = fields[start_index + 11]          # Número de satélites
+        gps_fix = fields[start_index + 12]       # Fixação do GPS
+        temp = fields[start_index + 13] if len(fields) > start_index + 13 else None  # Temperatura, se disponível
+
+        # Formatação da data e hora
+        formatted_date = f"{gps_date[:4]}-{gps_date[4:6]}-{gps_date[6:8]}"
+        formatted_time = f"{gps_time[:2]}:{gps_time[3:5]}:{gps_time[6:8]}"
+
+        # Exibindo os dados extraídos
+        print(f"Tipo de Dispositivo: {device_type}")
+        print(f"ID do Dispositivo: {device_id}")
+        print(f"Versão do Software: {sw_version}")
+        print(f"Modelo: {model}")
+        print(f"Cell ID: {cell_id}, MCC: {mcc}, MNC: {mnc}, RX Level: {rx_lvl}, LAC: {lac}, Timing Advance: {tm_adv}")
+
+        # Exibindo informações das células vizinhas
+        for idx, cell in enumerate(neighbor_cells, start=1):
+            print(f"Célula Vizinha {idx}: ID={cell['ID']}, MCC={cell['MCC']}, MNC={cell['MNC']}, LAC={cell['LAC']}, RX_LVL={cell['RX_LVL']}, TM_ADV={cell['TM_ADV']}")
+        
+        print(f"Voltagem de Backup: {backup_voltage}V, Status Online: {online_status}")
+        print(f"Número da Mensagem: {message_number}, Modo: {mode}, Canal de Rede Colaborativa: {col_net_rf_ch}")
+        print(f"Data e Hora: {formatted_date} {formatted_time}")
+        print(f"Latitude: {latitude}, Longitude: {longitude}")
+        print(f"Velocidade: {speed} km/h, Curso: {course} graus, Satélites: {satt}, GPS Fix: {gps_fix}, Temperatura: {temp}")
+    else:
+        print("Dados recebidos estão incompletos ou no formato errado.")
+
+# Configuração do servidor TCP
+HOST = '0.0.0.0'
+PORT = 8080
+
+server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server_socket.bind((HOST, PORT))
+server_socket.listen(5)
+
+print(f"Servidor TCP escutando no IP {HOST} e porta {PORT}...")
+
+while True:
+    client_socket, client_address = server_socket.accept()
+    print(f"Conexão recebida de {client_address}")
+
+    # Recebe dados do cliente
+    data = client_socket.recv(1024).decode('utf-8')
+    print(f"Dados recebidos: {data}")
+
+    # Processa os dados recebidos
+    parse_st410_data(data)
+
+    # Responde ao cliente (exemplo de resposta)
+    response = "+RESP:GTFRI,...$"  # Ajuste a resposta conforme necessário
+    client_socket.sendall(response.encode('utf-8'))
+    
+    client_socket.close()

@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+codigo servidor.txt
+
+# Virtual Environments
+venv/
+.env
+.venv/
+env/
+ENV/
+
+# Flask e Variáveis de Ambiente
+*.env
+*.flaskenv
+instance/
+config.py
+
+# IDEs e Ferramentas de Desenvolvimento
+.vscode/
+.idea/
+*.sublime-workspace
+
+# Logs e Arquivos Temporários
+*.log
+*.pot
+*.pyc
+*.pid
+.DS_Store
+*.swp
+*.swo
+
+# Banco de Dados Local
+*.sqlite3
+
+# Arquivos criados pelo Sistema
+Thumbs.db
