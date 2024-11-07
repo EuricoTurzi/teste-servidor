@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit
 from datetime import datetime
+import os
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
@@ -133,4 +134,6 @@ def index():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()  # Cria as tabelas no banco de dados
-    socketio.run(app, host='0.0.0.0', port=5000)
+    # Use a porta fornecida pelo Railway, com fallback para 8080
+    port = int(os.environ.get("PORT", 8080))
+    socketio.run(app, host='0.0.0.0', port=port)
