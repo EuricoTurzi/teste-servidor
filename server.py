@@ -140,8 +140,4 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()  # Cria as tabelas no banco de dados
     port = int(os.environ.get("PORT", 8080))
-<<<<<<< HEAD
     socketio.run(app, host='0.0.0.0', port=port)  # Parâmetro server='eventlet' foi removido
-=======
-    socketio.run(app, host='0.0.0.0', port=port, server='eventlet')
->>>>>>> 02508e92eebb42aabb2fd60d4156b31e78a26302
