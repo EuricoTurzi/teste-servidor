@@ -183,9 +183,17 @@ def send_command():
     else:
         return jsonify({"status": "error", "message": "Comando inválido"}), 400
 
-    # Adiciona o comando à fila de comandos pendentes
-    adicionar_comando(command)
-    return jsonify({"status": "success", "command_sent": command}), 200
+    # Envia o comando para o servidor TCP na AWS
+    try:
+        # Conecta ao servidor TCP na AWS
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.connect(("IP_DO_SERVIDOR_AWS", 8080))  # Substitua pelo IP correto da AWS
+            sock.sendall(command.encode('utf-8'))
+            response = sock.recv(1024).decode('utf-8')  # Recebe a resposta do servidor TCP
+
+        return jsonify({"status": "success", "command_sent": command, "response": response}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Falha ao enviar comando: {str(e)}"}), 500
 
 @app.route('/')
 def index():
