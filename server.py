@@ -163,6 +163,35 @@ def get_latest_data():
 
     return jsonify(data), 200
 
+# Endpoint para enviar comandos para o dispositivo
+@app.route('/send_command', methods=['POST'])
+def send_command():
+    data = request.json
+    device_id = data.get("device_id")
+    command_type = data.get("command_type")
+
+    # Validação dos parâmetros recebidos
+    if not device_id or not command_type:
+        return jsonify({"status": "error", "message": "device_id e command_type são obrigatórios"}), 400
+
+    # Formatação do comando com base no tipo solicitado
+    if command_type == "ReqICCID":
+        command = f"AT^ST410CMD;{device_id};02;ReqICCID"
+    elif command_type == "StartEmg":
+        command = f"AT^ST410CMD;{device_id};02;StartEmg"
+    elif command_type == "StopEmg":
+        command = f"AT^ST410CMD;{device_id};02;StopEmg"
+    else:
+        return jsonify({"status": "error", "message": "Comando inválido"}), 400
+
+    # Envio do comando para o dispositivo
+    try:
+        # Função que envia o comando via TCP (você precisa implementar isso)
+        enviar_comando_para_dispositivo(command)
+        return jsonify({"status": "success", "command_sent": command}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Falha ao enviar comando: {str(e)}"}), 500
+
 @app.route('/')
 def index():
     return """
@@ -177,6 +206,7 @@ def index():
             #data-table { margin-top: 20px; border-collapse: collapse; width: 100%; }
             #data-table th, #data-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
             #data-table th { background-color: #f2f2f2; }
+            #command-form { margin-top: 20px; }
         </style>
     </head>
     <body>
@@ -201,6 +231,22 @@ def index():
             </tbody>
         </table>
 
+        <!-- Formulário para envio de comando -->
+        <div id="command-form">
+            <h3>Enviar Comando</h3>
+            <label for="device-id">ID do Dispositivo:</label>
+            <input type="text" id="device-id" placeholder="Digite o ID do dispositivo" required>
+            <label for="command-type">Tipo de Comando:</label>
+            <select id="command-type" required>
+                <option value="">Selecione o Comando</option>
+                <option value="ReqICCID">ReqICCID</option>
+                <option value="StartEmg">StartEmg</option>
+                <option value="StopEmg">StopEmg</option>
+            </select>
+            <button onclick="sendCommand()">Enviar Comando</button>
+            <p id="command-response"></p>
+        </div>
+
         <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
         <script>
             var map = L.map('map').setView([-23.636415, -46.512757], 12);
@@ -210,20 +256,16 @@ def index():
                 attribution: '© OpenStreetMap'
             }).addTo(map);
 
-            // Armazena marcadores para múltiplos dispositivos
             var markers = {};
 
             function updateData() {
                 fetch('/latest_data')
                     .then(response => response.json())
                     .then(devices => {
-                        // Limpa a tabela
                         const dataBody = document.getElementById("data-body");
                         dataBody.innerHTML = '';
 
-                        // Atualiza cada dispositivo no mapa e na tabela
                         devices.forEach(device => {
-                            // Atualiza ou cria um marcador no mapa
                             var lat = device.latitude;
                             var lon = device.longitude;
                             if (markers[device.device_id]) {
@@ -233,7 +275,6 @@ def index():
                                     .bindPopup("<b>ID do Dispositivo:</b> " + device.device_id);
                             }
 
-                            // Adiciona uma linha na tabela para cada dispositivo
                             const row = document.createElement('tr');
                             row.innerHTML = `
                                 <td>${device.device_id}</td>
@@ -252,7 +293,38 @@ def index():
                     .catch(error => console.error('Erro ao obter dados:', error));
             }
 
-            setInterval(updateData, 5000);  // Atualiza a cada 5 segundos
+            setInterval(updateData, 5000);
+
+            function sendCommand() {
+                const deviceId = document.getElementById("device-id").value;
+                const commandType = document.getElementById("command-type").value;
+                const responseText = document.getElementById("command-response");
+
+                if (!deviceId || !commandType) {
+                    responseText.textContent = "Por favor, preencha todos os campos.";
+                    return;
+                }
+
+                fetch('/send_command', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ device_id: deviceId, command_type: commandType })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === "success") {
+                        responseText.textContent = "Comando enviado com sucesso!";
+                    } else {
+                        responseText.textContent = `Erro: ${data.message}`;
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao enviar comando:', error);
+                    responseText.textContent = "Erro ao enviar comando.";
+                });
+            }
         </script>
     </body>
     </html>
