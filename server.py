@@ -188,7 +188,7 @@ def send_command():
     try:
         # Conecta ao servidor TCP na AWS
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.connect(("IP_DO_SERVIDOR_AWS", 8080))  # Substitua pelo IP correto da AWS
+            sock.connect(("3.143.221.181", 8080))  # Substitua pelo IP correto da AWS
             sock.sendall(command.encode('utf-8'))
             response = sock.recv(1024).decode('utf-8')  # Recebe a resposta do servidor TCP
 
