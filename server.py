@@ -176,11 +176,11 @@ def send_command():
 
     # Formatação do comando com base no tipo solicitado
     if command_type == "ReqICCID":
-        command = f"AT^ST410CMD;{device_id};02;ReqICCID"
+        command = f"ST410CMD;{device_id};02;ReqICCID"
     elif command_type == "StartEmg":
-        command = f"AT^ST410CMD;{device_id};02;StartEmg"
+        command = f"ST410CMD;{device_id};02;StartEmg"
     elif command_type == "StopEmg":
-        command = f"AT^ST410CMD;{device_id};02;StopEmg"
+        command = f"ST410CMD;{device_id};02;StopEmg"
     else:
         return jsonify({"status": "error", "message": "Comando inválido"}), 400
 
