@@ -177,11 +177,11 @@ def send_command():
 
     # Formatação do comando com base no tipo solicitado
     if command_type == "ReqICCID":
-        command = f"ST410CMD;{device_id};02;ReqICCID"  # Adiciona nova linha
+        command = f"ST410CMD;{device_id};02;ReqICCID\n"  # Adiciona nova linha
     elif command_type == "StartEmg":
-        command = f"ST410CMD;{device_id};02;StartEmg"
+        command = f"ST410CMD;{device_id};02;StartEmg\n"
     elif command_type == "StopEmg":
-        command = f"ST410CMD;{device_id};02;StopEmg"
+        command = f"ST410CMD;{device_id};02;StopEmg\n"
     else:
         return jsonify({"status": "error", "message": "Comando inválido"}), 400
 
@@ -192,10 +192,12 @@ def send_command():
             sock.connect(("3.143.221.181", 8080))  # Substitua pelo IP correto da AWS
             command_bytes = command.encode('utf-8')  # Codificando para bytes
             sock.sendall(command_bytes)  # Envia os bytes
+            print(f"Comando enviado: {command.strip()}")  # Adiciona log para confirmar o envio
             time.sleep(1)  # Aguarda um segundo antes de receber a resposta
             response = sock.recv(1024).decode('utf-8')  # Recebe a resposta do servidor TCP
+            print(f"Resposta recebida: {response.strip()}")  # Log da resposta
 
-        return jsonify({"status": "success", "command_sent": command, "response": response}), 200
+        return jsonify({"status": "success", "command_sent": command.strip(), "response": response.strip()}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": f"Falha ao enviar comando: {str(e)}"}), 500
 
