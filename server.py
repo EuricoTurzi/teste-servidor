@@ -58,6 +58,16 @@ class NeighborCell(db.Model):
     rx_lvl = db.Column(db.String(5))
     tm_adv = db.Column(db.String(5))
 
+class PendingCommand(db.Model):
+    __tablename__ = 'pending_commands'
+    id = db.Column(db.Integer, primary_key=True)
+    device_id = db.Column(db.String(20), nullable=False)
+    command = db.Column(db.String(100), nullable=False)
+    status = db.Column(db.String(20), default='pendente')  # Status: 'pendente', 'enviado', 'respondido'
+    response = db.Column(db.String(100), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
+
 @app.route('/receive_data', methods=['POST'])
 def receive_data():
     data = request.json  # Espera dados JSON
@@ -200,6 +210,40 @@ def send_command():
         return jsonify({"status": "success", "command_sent": command.strip(), "response": response.strip()}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": f"Falha ao enviar comando: {str(e)}"}), 500
+
+@app.route('/check_pending_commands', methods=['GET'])
+def check_pending_commands():
+    # Endpoint para o servidor consultar comandos pendentes para um dispositivo específico
+    device_id = request.args.get('device_id')
+    if not device_id:
+        return jsonify({"status": "error", "message": "device_id é obrigatório"}), 400
+
+    pending_commands = PendingCommand.query.filter_by(device_id=device_id, status='pendente').all()
+    commands = [{"id": cmd.id, "command": cmd.command} for cmd in pending_commands]
+
+    return jsonify({"status": "success", "pending_commands": commands})
+
+@app.route('/update_command_status', methods=['POST'])
+def update_command_status():
+    # Atualiza o status do comando e armazena a resposta
+    data = request.json
+    command_id = data.get("command_id")
+    status = data.get("status")
+    response = data.get("response", None)
+
+    if not command_id or not status:
+        return jsonify({"status": "error", "message": "command_id e status são obrigatórios"}), 400
+
+    command = PendingCommand.query.get(command_id)
+    if not command:
+        return jsonify({"status": "error", "message": "Comando não encontrado"}), 404
+
+    command.status = status
+    command.response = response
+    db.session.commit()
+
+    return jsonify({"status": "success", "message": "Status do comando atualizado com sucesso"})
+
 
 @app.route('/')
 def index():
