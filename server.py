@@ -176,7 +176,7 @@ def send_command():
 
     # Formatação do comando com base no tipo solicitado
     if command_type == "ReqICCID":
-        command = f"ST410CMD;{device_id};02;ReqICCID"
+        command = f"ST410CMD;{device_id};02;ReqICCID"  # Adiciona nova linha
     elif command_type == "StartEmg":
         command = f"ST410CMD;{device_id};02;StartEmg"
     elif command_type == "StopEmg":
@@ -189,7 +189,9 @@ def send_command():
         # Conecta ao servidor TCP na AWS
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect(("3.143.221.181", 8080))  # Substitua pelo IP correto da AWS
-            sock.sendall(command.encode('utf-8'))
+            command_bytes = command.encode('utf-8')  # Codificando para bytes
+            sock.sendall(command_bytes)  # Envia os bytes
+            time.sleep(1)  # Aguarda um segundo antes de receber a resposta
             response = sock.recv(1024).decode('utf-8')  # Recebe a resposta do servidor TCP
 
         return jsonify({"status": "success", "command_sent": command, "response": response}), 200
