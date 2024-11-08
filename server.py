@@ -181,13 +181,12 @@ def send_command():
     device_id = data.get("device_id")
     command_type = data.get("command_type")
 
-    # Validação dos parâmetros recebidos
+    # Validação dos parâmetros
     if not device_id or not command_type:
         return jsonify({"status": "error", "message": "device_id e command_type são obrigatórios"}), 400
 
-    # Formatação do comando com base no tipo solicitado
     if command_type == "ReqICCID":
-        command = f"ST410CMD;{device_id};02;ReqICCID\n"  # Adiciona nova linha
+        command = f"ST410CMD;{device_id};02;ReqICCID\n"
     elif command_type == "StartEmg":
         command = f"ST410CMD;{device_id};02;StartEmg\n"
     elif command_type == "StopEmg":
@@ -195,21 +194,12 @@ def send_command():
     else:
         return jsonify({"status": "error", "message": "Comando inválido"}), 400
 
-    # Envia o comando para o servidor TCP na AWS
-    try:
-        # Conecta ao servidor TCP na AWS
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.connect(("3.143.221.181", 8080))  # Substitua pelo IP correto da AWS
-            command_bytes = command.encode('utf-8')  # Codificando para bytes
-            sock.sendall(command_bytes)  # Envia os bytes
-            print(f"Comando enviado: {command.strip()}")  # Adiciona log para confirmar o envio
-            time.sleep(1)  # Aguarda um segundo antes de receber a resposta
-            response = sock.recv(1024).decode('utf-8')  # Recebe a resposta do servidor TCP
-            print(f"Resposta recebida: {response.strip()}")  # Log da resposta
+    # Salva o comando como pendente no banco de dados
+    pending_command = PendingCommand(device_id=device_id, command=command)
+    db.session.add(pending_command)
+    db.session.commit()
 
-        return jsonify({"status": "success", "command_sent": command.strip(), "response": response.strip()}), 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": f"Falha ao enviar comando: {str(e)}"}), 500
+    return jsonify({"status": "success", "message": "Comando salvo e aguardando envio ao dispositivo."})
 
 @app.route('/check_pending_commands', methods=['GET'])
 def check_pending_commands():
@@ -243,7 +233,6 @@ def update_command_status():
     db.session.commit()
 
     return jsonify({"status": "success", "message": "Status do comando atualizado com sucesso"})
-
 
 @app.route('/')
 def index():
