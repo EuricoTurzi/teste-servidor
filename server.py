@@ -7,6 +7,7 @@ from flask_socketio import SocketIO, emit
 from datetime import datetime
 import os
 import eventlet
+import socket
 eventlet.monkey_patch()
 
 app = Flask(__name__)
