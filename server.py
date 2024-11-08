@@ -163,7 +163,6 @@ def get_latest_data():
 
     return jsonify(data), 200
 
-# Endpoint para enviar comandos para o dispositivo
 @app.route('/send_command', methods=['POST'])
 def send_command():
     data = request.json
@@ -184,13 +183,9 @@ def send_command():
     else:
         return jsonify({"status": "error", "message": "Comando inválido"}), 400
 
-    # Envio do comando para o dispositivo
-    try:
-        # Função que envia o comando via TCP (você precisa implementar isso)
-        enviar_comando_para_dispositivo(command)
-        return jsonify({"status": "success", "command_sent": command}), 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": f"Falha ao enviar comando: {str(e)}"}), 500
+    # Adiciona o comando à fila de comandos pendentes
+    adicionar_comando(command)
+    return jsonify({"status": "success", "command_sent": command}), 200
 
 @app.route('/')
 def index():

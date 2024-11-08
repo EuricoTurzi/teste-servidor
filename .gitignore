@@ -22,6 +22,7 @@ ENV/
 *.flaskenv
 instance/
 config.py
+servidor.py
 
 # IDEs e Ferramentas de Desenvolvimento
 .vscode/
